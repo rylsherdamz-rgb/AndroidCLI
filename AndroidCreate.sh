@@ -1,6 +1,6 @@
 #!/bin/bash
-# android-create: create a Java Android project quickly
-# Usage: ./android-create.sh ProjectName com.example.package [--build] [--install]
+# AndroidCreate.sh: create a reusable Java Android project quickly
+# Usage: ./AndroidCreate.sh ProjectName com.example.package [--build] [--install]
 
 set -e
 
@@ -32,6 +32,9 @@ APP_DIR="$ROOT_DIR/app"
 JAVA_DIR="$APP_DIR/src/main/java/$(echo $PACKAGE_NAME | tr '.' '/')"
 RES_DIR="$APP_DIR/src/main/res/layout"
 
+ANDROID_PLUGIN_VERSION="8.2.1"
+GRADLE_VERSION="9.1"
+
 # -------------------------
 # 3️⃣ Create folders
 # -------------------------
@@ -39,7 +42,16 @@ mkdir -p "$JAVA_DIR"
 mkdir -p "$RES_DIR"
 
 # -------------------------
-# 4️⃣ Create files
+# 4️⃣ Generate Gradle wrapper
+# -------------------------
+cd "$ROOT_DIR"
+if [ ! -f "gradlew" ]; then
+  echo "Generating Gradle wrapper..."
+  gradle wrapper --gradle-version $GRADLE_VERSION
+fi
+
+# -------------------------
+# 5️⃣ Create build.gradle files
 # -------------------------
 
 # settings.gradle
@@ -48,17 +60,29 @@ rootProject.name = "$PROJECT_NAME"
 include(":app")
 EOL
 
-# root build.gradle
+# project-level build.gradle
 cat >"$ROOT_DIR/build.gradle" <<EOL
-// Root build.gradle
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:$ANDROID_PLUGIN_VERSION"
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
 EOL
 
-# app/build.gradle
+# app-level build.gradle
 cat >"$APP_DIR/build.gradle" <<EOL
-plugins {
-    id 'com.android.application'
-    id 'java'
-}
+apply plugin: 'com.android.application'
 
 android {
     compileSdk 33
@@ -84,6 +108,7 @@ dependencies {
 EOL
 
 # AndroidManifest.xml
+mkdir -p "$APP_DIR/src/main"
 cat >"$APP_DIR/src/main/AndroidManifest.xml" <<EOL
 <manifest package="$PACKAGE_NAME" xmlns:android="http://schemas.android.com/apk/res/android">
     <application
@@ -119,7 +144,7 @@ public class MainActivity extends AppCompatActivity {
 }
 EOL
 
-# activity_main.xml (optional starter layout)
+# activity_main.xml
 cat >"$RES_DIR/activity_main.xml" <<EOL
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -136,27 +161,11 @@ cat >"$RES_DIR/activity_main.xml" <<EOL
 EOL
 
 # -------------------------
-# 5️⃣ Create Gradle wrapper if needed
+# 6️⃣ Build APK (optional)
 # -------------------------
 cd "$ROOT_DIR"
 
-if [ ! -f "./gradlew" ]; then
-  echo "Generating Gradle wrapper..."
-  if ! command -v gradle >/dev/null 2>&1; then
-    echo "Error: Gradle is not installed. Install it or add it to PATH."
-    exit 1
-  fi
-  gradle wrapper --gradle-version 9.1
-fi
-
-# -------------------------
-# 6️⃣ Build APK (optional)
-# -------------------------
 if $BUILD; then
-  if ! command -v ./gradlew >/dev/null 2>&1; then
-    echo "Error: gradlew not found. Wrapper generation failed?"
-    exit 1
-  fi
   echo "Building APK..."
   ./gradlew assembleDebug
   echo "APK built at: $APP_DIR/build/outputs/apk/debug/app-debug.apk"
@@ -166,10 +175,6 @@ fi
 # 7️⃣ Install APK (optional)
 # -------------------------
 if $INSTALL; then
-  if ! command -v adb >/dev/null 2>&1; then
-    echo "Error: adb not found. Install Android SDK platform-tools."
-    exit 1
-  fi
   echo "Installing APK on device..."
   adb install -r "$APP_DIR/build/outputs/apk/debug/app-debug.apk"
 fi
