@@ -136,20 +136,40 @@ cat >"$RES_DIR/activity_main.xml" <<EOL
 EOL
 
 # -------------------------
-# 5️⃣ Build APK (optional)
+# 5️⃣ Create Gradle wrapper if needed
 # -------------------------
 cd "$ROOT_DIR"
 
+if [ ! -f "./gradlew" ]; then
+  echo "Generating Gradle wrapper..."
+  if ! command -v gradle >/dev/null 2>&1; then
+    echo "Error: Gradle is not installed. Install it or add it to PATH."
+    exit 1
+  fi
+  gradle wrapper --gradle-version 9.1
+fi
+
+# -------------------------
+# 6️⃣ Build APK (optional)
+# -------------------------
 if $BUILD; then
+  if ! command -v ./gradlew >/dev/null 2>&1; then
+    echo "Error: gradlew not found. Wrapper generation failed?"
+    exit 1
+  fi
   echo "Building APK..."
   ./gradlew assembleDebug
   echo "APK built at: $APP_DIR/build/outputs/apk/debug/app-debug.apk"
 fi
 
 # -------------------------
-# 6️⃣ Install APK (optional)
+# 7️⃣ Install APK (optional)
 # -------------------------
 if $INSTALL; then
+  if ! command -v adb >/dev/null 2>&1; then
+    echo "Error: adb not found. Install Android SDK platform-tools."
+    exit 1
+  fi
   echo "Installing APK on device..."
   adb install -r "$APP_DIR/build/outputs/apk/debug/app-debug.apk"
 fi
